@@ -6,8 +6,8 @@ import io
 # 1. Konfigurasi Halaman
 st.set_page_config(page_title="Miftah X-Generator", page_icon="🐦")
 
-st.title("🐦 X Content Generator (Diagnostic Mode)")
-st.write("Aplikasi ini otomatis mendeteksi model Gemini yang tersedia untuk Anda.")
+st.title("🐦 X Content Generator by Miftah")
+st.write("Aplikasi ini akan membantu kamu dalam membuat konten X sesuai dengan karakter atau role model kamu. Hasilnya terdiri dari 3 opsi yaitu : 1 single tweet, 3 tweet thread dan 1 tweet long post atau panjang.")
 
 # 2. Setup API Key secara Aman
 try:

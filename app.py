@@ -1,21 +1,20 @@
 import streamlit as st
-from google.genai import Client
+import google.generativeai as genai
 import PyPDF2
 import io
 
-# Konfigurasi halaman agar terlihat profesional
+# Konfigurasi Halaman
 st.set_page_config(page_title="Miftah X-Generator", page_icon="🐦")
 
 st.title("🐦 X Content Generator")
-st.write("Ubah data PDF menjadi postingan X dengan gaya tokoh favoritmu.")
+st.write("Ubah data PDF menjadi postingan X dengan gaya favoritmu.")
 
-# Mengambil API Key dari Secrets Streamlit
-# Pastikan di Advanced Settings sudah diisi: GEMINI_API_KEY = "KODE_ANDA"
+# Ambil API Key dari Secrets
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
-    client = Client(api_key=api_key)
+    genai.configure(api_key=api_key)
 except Exception as e:
-    st.error("API Key tidak ditemukan di Secrets. Pastikan sudah diatur di Streamlit Cloud.")
+    st.error("API Key belum diatur di Secrets Streamlit Cloud.")
     st.stop()
 
 def extract_text(pdf_file):
@@ -27,39 +26,31 @@ def extract_text(pdf_file):
             text += content
     return text
 
-# Input Antarmuka
-persona = st.text_input("Gaya Karakter", placeholder="Contoh: Ferry Irwandi - Kritis & Edukatif")
+# Antarmuka Pengguna
+persona = st.text_input("Gaya Karakter", placeholder="Contoh: Ferry Irwandi")
 uploaded_file = st.file_uploader("Upload PDF Proyek", type="pdf")
 
 if st.button("Generate Postingan ✨"):
     if persona and uploaded_file:
-        with st.spinner("AI sedang berpikir..."):
+        with st.spinner("Sedang memproses..."):
             raw_text = extract_text(uploaded_file)
             
-            # Prompt Engineering khusus untuk gaya Ferry Irwandi & Crypto Yapping
-            prompt = f"""
-            Anda adalah pakar konten X dengan gaya: {persona}.
-            Data proyek: {raw_text[:8000]}
+            # MENGHINDARI ERROR 404: 
+            # Kita panggil model secara eksplisit tanpa prefix v1beta
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
-            Buat 3 Opsi:
-            1. OPSI 1: 1 Tweet (Maks 280 Karakter).
-            2. OPSI 2: Thread 3 Tweet (Maks 280 Karakter per tweet).
-            3. OPSI 3: Long Post (Maks 700 Karakter).
-            
-            Gunakan bahasa yang tajam dan berbasis data. Tampilkan jumlah karakter di akhir setiap opsi.
-            """
+            prompt = f"Bertindaklah sebagai {persona}. Gunakan data ini: {raw_text[:7000]}. Buat 3 opsi postingan X: 1 tweet singkat, 1 thread 3 tweet, dan 1 long post 700 karakter. Sertakan jumlah karakter."
             
             try:
-                # Menggunakan jalur stable (non-beta) secara otomatis
-                response = client.models.generate_content(
-                    model='gemini-1.5-flash',
-                    contents=prompt
-                )
+                # Menggunakan safety_settings untuk memastikan respon lancar
+                response = model.generate_content(prompt)
+                
                 st.divider()
-                st.subheader("Hasil Generasi:")
+                st.subheader("Hasil untuk Konten X Anda:")
                 st.markdown(response.text)
                 st.balloons()
             except Exception as e:
-                st.error(f"Terjadi kendala teknis: {e}")
+                st.error(f"Terjadi kendala pada model AI: {e}")
+                st.info("Saran: Coba hapus dan buat ulang API Key di Google AI Studio jika masalah berlanjut.")
     else:
-        st.warning("Mohon isi gaya karakter dan unggah file PDF.")
+        st.warning("Mohon lengkapi input gaya dan file PDF.")

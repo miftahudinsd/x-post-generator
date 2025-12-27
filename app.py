@@ -3,54 +3,70 @@ import google.generativeai as genai
 import PyPDF2
 import io
 
-# Konfigurasi Halaman
+# 1. Konfigurasi Halaman
 st.set_page_config(page_title="Miftah X-Generator", page_icon="🐦")
 
-st.title("🐦 X Content Generator")
-st.write("Ubah data PDF menjadi postingan X dengan gaya favoritmu.")
+st.title("🐦 X Content Generator (Diagnostic Mode)")
+st.write("Aplikasi ini otomatis mendeteksi model Gemini yang tersedia untuk Anda.")
 
-# Ambil API Key dari Secrets
+# 2. Setup API Key secara Aman
 try:
+    # Mengambil dari Advanced Settings > Secrets di Streamlit Cloud
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
 except Exception as e:
-    st.error("API Key belum diatur di Secrets Streamlit Cloud.")
+    st.error("API Key tidak ditemukan. Pastikan sudah diatur di 'Secrets' Streamlit.")
     st.stop()
 
-def extract_text(pdf_file):
-    reader = PyPDF2.PdfReader(pdf_file)
-    text = ""
-    for page in reader.pages:
-        content = page.extract_text()
-        if content:
-            text += content
-    return text
+# 3. Fungsi Diagnostik (Diambil dari logika Colab Anda)
+def get_best_model():
+    """Mencari model yang aktif secara otomatis"""
+    try:
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        # Urutan prioritas model
+        for target in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-1.0-pro']:
+            if target in available_models:
+                return target
+        return available_models[0] if available_models else None
+    except:
+        return 'models/gemini-1.5-flash' # Default jika list gagal
 
-# Antarmuka Pengguna
+def extract_pdf_text(uploaded_file):
+    pdf_reader = PyPDF2.PdfReader(uploaded_file)
+    return "".join([page.extract_text() for page in pdf_reader.pages if page.extract_text()])
+
+# 4. Antarmuka Streamlit (Pengganti input() dan files.upload())
 persona = st.text_input("Gaya Karakter", placeholder="Contoh: Ferry Irwandi")
 uploaded_file = st.file_uploader("Upload PDF Proyek", type="pdf")
 
 if st.button("Generate Postingan ✨"):
     if persona and uploaded_file:
-        with st.spinner("Sedang memproses..."):
-            raw_text = extract_text(uploaded_file)
+        with st.spinner("Mendiagnosa model dan memproses konten..."):
+            # Ekstrak Teks
+            raw_text = extract_pdf_text(uploaded_file)
             
-            # MENGHINDARI ERROR 404: 
-            # Kita panggil model secara eksplisit tanpa prefix v1beta
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            # Deteksi Model Aktif (Logika Colab Anda)
+            working_model = get_best_model()
+            st.caption(f"Sistem menggunakan model: {working_model}")
             
-            prompt = f"Bertindaklah sebagai {persona}. Gunakan data ini: {raw_text[:7000]}. Buat 3 opsi postingan X: 1 tweet singkat, 1 thread 3 tweet, dan 1 long post 700 karakter. Sertakan jumlah karakter."
+            model = genai.GenerativeModel(working_model)
+            prompt = f"""
+            Bertindaklah sebagai {persona}. 
+            Gunakan data ini: {raw_text[:8000]}
+            
+            Buat 3 opsi postingan X:
+            1. 1 Tweet (280 char)
+            2. Thread 3 Tweet
+            3. Long Post (700 char)
+            """
             
             try:
-                # Menggunakan safety_settings untuk memastikan respon lancar
                 response = model.generate_content(prompt)
-                
                 st.divider()
-                st.subheader("Hasil untuk Konten X Anda:")
+                st.subheader("HASIL POSTINGAN ANDA:")
                 st.markdown(response.text)
                 st.balloons()
             except Exception as e:
-                st.error(f"Terjadi kendala pada model AI: {e}")
-                st.info("Saran: Coba hapus dan buat ulang API Key di Google AI Studio jika masalah berlanjut.")
+                st.error(f"Gagal generate: {e}")
     else:
-        st.warning("Mohon lengkapi input gaya dan file PDF.")
+        st.warning("Mohon isi gaya dan upload file PDF.")

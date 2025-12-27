@@ -7,7 +7,7 @@ import io
 st.set_page_config(page_title="Miftah X-Generator Pro", page_icon="🐦")
 
 st.title("🐦 X Content Generator by Miftah")
-st.write("Aplikasi ini akan membantu kamu dalam membuat konten X sesuai dengan role model kamu.")
+st.write("Aplikasi untuk membuat konten X yang jujur, analitis, dan bebas 'AI-Slop'.")
 
 # 2. Setup API Key secara Aman
 try:
@@ -17,7 +17,7 @@ except Exception as e:
     st.error("API Key tidak ditemukan di 'Secrets' Streamlit.")
     st.stop()
 
-# 3. Fungsi Diagnostik & Ekstrak PDF
+# 3. Fungsi Ekstrak PDF & Pencarian Model
 def get_best_model():
     try:
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -36,60 +36,54 @@ persona = st.text_input("Gaya Karakter", placeholder="Contoh: Ferry Irwandi")
 
 format_pilihan = st.selectbox(
     "Pilih Format Hasil Postingan:",
-    ("Single Post (280 Karakter Huruf)", "Thread (5 Tweet)", "Long Post (1000 Karakter Huruf - Deep Insight)")
+    ("Single Post", "Thread (5 Tweet)", "Long Post")
 )
 
 uploaded_file = st.file_uploader("Upload PDF Proyek", type="pdf")
 
 if st.button("Generate Postingan ✨"):
     if persona and uploaded_file:
-        with st.spinner(f"Sedang meracik {format_pilihan} dengan standar Anti AI-Slop..."):
+        with st.spinner(f"Sedang meracik {format_pilihan}..."):
             raw_text = extract_pdf_text(uploaded_file)
             working_model = get_best_model()
             model = genai.GenerativeModel(working_model)
             
-            # --- SISTEM INSTRUKSI (GAYA BAHASA & LARANGAN) ---
-            sistem_rules = """
-            GAYA BAHASA & NADA:
-            - Tenang, reflektif, hangat, analitis.
-            - Bahasa Indonesia rapi, netral, kalimat pendek.
-            - Satu ide per baris; gunakan line breaks.
-            - Nada: berdiskusi antar pemikir, bukan menggurui atau berjualan.
-            - Hindari slang ("gue/lo") dan jargon tanpa konteks.
-
-            LARANGAN (WAJIB):
-            - Tidak: janji keuntungan, prediksi harga, FOMO, promosi agresif.
-            - Tidak: teks generik, klikbait emosional, tribalism.
-            - Jangan menyertakan catatan proses atau metadata dalam output.
-
-            OVERRIDE RULE — ANTI AI-SLOP (FINAL GATE):
-            Sebelum mengirim output, pastikan:
-            1. Konten spesifik pada mekanisme unik proyek, bukan umum.
-            2. Tambahkan sudut pandang/reframing, jangan hanya ringkasan.
-            3. Pecah ritme agar tidak template-like.
-            4. Gunakan bahasa hipotesis/probabilistik (bukan klaim absolut).
-            5. Kembali ke analisis insentif dan trade-off (bukan hype).
-            6. Tutup dengan refleksi atau implikasi desain (bukan CTA klise).
-            7. Konten harus terasa 'jujur dan berpikir' daripada 'rapi dan pintar'.
-            """
-
-            if format_pilihan == "Single Post (280 Karakter)":
-                tugas = "Buat 1 tweet (maks 280 karakter huruf) dengan hook provokatif cerdas."
+            # --- LOGIKA TUGAS UTAMA (DIPERKETAT) ---
+            if format_pilihan == "Single Post":
+                tugas_absolut = "TUGAS: HANYA BUAT 1 TWEET SINGKAT (maks 280 karakter). Dilarang membuat thread atau teks panjang."
             elif format_pilihan == "Thread (5 Tweet)":
-                tugas = "Buat thread 5 tweet (masing-masing maks 280 karakter huruf) yang mengalir dari masalah ke analisis."
+                tugas_absolut = "TUGAS: HANYA BUAT THREAD 5 TWEET (masing-masing maks 280 karakter). Dilarang menggabungkannya menjadi satu tweet tunggal."
             else:
-                tugas = "Buat 1 long post (maks 1000 karakter huruf) yang penuh analisis kritis dan konsekuensi tidak eksplisit."
+                tugas_absolut = "TUGAS: HANYA BUAT 1 POSTINGAN PANJANG (maks 1000 karakter). Pastikan isi penuh dengan analisis kritis dan mendalam."
 
-            prompt = f"{sistem_rules}\n\nDATA PROYEK: {raw_text[:8000]}\nPERSONA: {persona}\nTUGAS: {tugas}"
+            # --- PROMPT DENGAN STRUKTUR PRIORITAS ---
+            prompt = f"""
+            {tugas_absolut}
+
+            PERSONA: {persona}
+            DATA PROYEK: {raw_text[:8000]}
+
+            GAYA BAHASA & NADA (WAJIB):
+            - Tenang, reflektif, hangat, analitis. Kalimat pendek; satu ide per baris.
+            - Nada: berdiskusi antar pemikir, bukan menggurui atau berjualan.
+            - Dilarang: janji keuntungan, prediksi harga, FOMO, atau promosi agresif.
+
+            OVERRIDE RULE — ANTI AI-SLOP:
+            1. Konten harus spesifik pada mekanisme unik proyek, bukan umum.
+            2. Tambahkan sudut pandang/reframing, jangan hanya ringkasan.
+            3. Gunakan bahasa hipotesis/probabilistik (bukan klaim absolut).
+            4. Tutup dengan refleksi atau implikasi desain.
+            5. Tampilkan jumlah karakter di akhir output.
+            """
             
             try:
                 response = model.generate_content(prompt)
                 st.divider()
                 st.subheader(f"Hasil {format_pilihan}:")
-                # Menampilkan teks dengan format line break yang benar
-                st.write(response.text)
+                # Menampilkan dalam box agar mudah dibaca/copy
+                st.info(response.text)
                 st.balloons()
             except Exception as e:
                 st.error(f"Gagal generate: {e}")
     else:
-        st.warning("Mohon isi gaya dan upload file PDF.")
+        st.warning("Mohon isi gaya karakter dan unggah file PDF.")
